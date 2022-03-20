@@ -1,0 +1,42 @@
+DanmakuFactory_Template_Version: 1.0
+
+# 1.'#'打头的语句是注释，不会被解析，也就是说整个文件中只有开头不是 '#' 的语句有效
+
+# 2.举个例子，下面是一条弹幕在文件中的格式，format:行的下一行就是我们需要做的声明
+# {"type":0,"fontsize":20,"count":1234567,"content":"awsl","time":0,"color":16777215}
+
+format:
+{"type":$type$,"fontsize":$fontsize$,"count":$anynumber$,"content":"$text$","time":$time$,"color":$color$}
+
+# 用变量代替来声明弹幕的格式
+# 用 $time$ 替换时间，必须是一个整数或小数
+# 用 $type$ 代替弹幕类型，必须是一个整数
+# 用 $color$ 代替颜色，必须是一个整数
+# 用 $fontsize$ 代替文字大小，必须是一个整数
+# 用 $text$ 代替弹幕内容，应当是一个字符串
+# $type$、$color$、$fontsize$ 在format中不是必须要出现的，如果没有则用默认的代替
+
+# 除了上面的五个，还有两个空白变量
+# 用 $anynumber$ 代替任意数字（包括小数）并丢弃，如上uid是可变的，但我们不需要
+# 用 $anystring$ 代替任意字符串并丢弃
+
+# 3.用 set $变量$ 的格式表示设定该变量的一些相关属性，当然有什么属性是我已经规定好的(*^_^*)
+# 下面这一条就是要设置时间的参数
+set $time$:
+    Ratio_to_seconds = 1 # 定义$time$跟实际秒数的比例，可以是小数，应当满足：( Ratio_to_seconds = $time$ ÷ 实际秒数 )
+
+set $type$:
+    right_to_left = 0 # 右向左滚动弹幕，例 {"type":0,"font... 将会被解析成右左弹幕
+    left_to_right = 1 # 左向右滚动弹幕，例 {"type":1,"font... 将会被解析成左右弹幕
+    top_fix = 2       # 顶部固定弹幕
+    bottom_fix = 3    # 底部固定弹幕
+    # 如果你在fotmat中未指定$type$，请用下面的语句，表示将类型未识别的全部弹幕设定成某种类型
+    default_type = right_to_left
+
+set $color$:
+    # 表示将颜色读入错误的弹幕全部设定为某种颜色
+    default_color = 16777215
+    
+set $fontsize$:
+    # 表示将字体大小读入错误的弹幕全部设定为某个大小
+    default_fontsize = 25
