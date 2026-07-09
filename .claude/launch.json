@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-analyzer-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "web-analyzer", "dev", "--port", "5233", "--strictPort"],
+      "port": 5233
+    }
+  ]
+}
