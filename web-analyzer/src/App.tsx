@@ -16,7 +16,7 @@ import {
 } from '@/lib/adb'
 import { aggregate, parseEntry, type CacheItem, type CacheReport, type RawEntry } from '@/lib/bili'
 
-// 播放器（连同 Artplayer / mp4box / ffmpeg.wasm）作为独立路由页，按需加载
+// 播放器（连同 Artplayer / mp4box）作为独立路由页，按需加载
 const PlayerPage = lazy(() => import('@/pages/PlayerPage'))
 
 type Source = 'device' | 'sample'

@@ -12,9 +12,6 @@ dist
 dist-ssr
 *.local
 
-# ffmpeg.wasm core（~31MB，由 postinstall 从 node_modules 复制生成，不入库）
-/public/ffmpeg/
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

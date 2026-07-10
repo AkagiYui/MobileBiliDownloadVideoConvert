@@ -14,7 +14,6 @@ import {
   MessageSquareIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import {
   attachDualStreamStreaming,
   parseDanmaku,
@@ -22,20 +21,14 @@ import {
   type ByteStream,
   type DualStreamHandle,
 } from '@/lib/media'
-import { exportMuxed, loadFfmpeg, type ExportMeta } from '@/lib/ffmpeg'
-import { downloadBytes, safeFilename, saveStreamed, type StreamSource } from '@/lib/download'
+import { remuxFmp4 } from '@/lib/remux'
+import { downloadBytes, safeFilename, saveStreamed, saveWith, type StreamSource } from '@/lib/download'
 import { formatBytes, formatDuration, type CacheItem } from '@/lib/bili'
 import type { Connection } from '@/lib/adb'
-import { openMediaFile, openMediaStreams, readMedia } from '@/lib/adb'
+import { openMediaFile, openMediaStreams } from '@/lib/adb'
 import { cn } from '@/lib/utils'
 
 type ExportKind = 'video' | 'audio' | 'mux'
-
-async function fetchBytes(url: string): Promise<Uint8Array> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return new Uint8Array(await res.arrayBuffer())
-}
 
 export function PlayerView({
   playlist,
@@ -64,7 +57,6 @@ export function PlayerView({
   const [errorMsg, setErrorMsg] = useState('')
   const [playbackWarning, setPlaybackWarning] = useState('')
   const [exporting, setExporting] = useState<ExportKind | null>(null)
-  const [exportRatio, setExportRatio] = useState(0)
   const [exportNote, setExportNote] = useState('')
   const [danmakuXml, setDanmakuXml] = useState('')
 
@@ -192,62 +184,40 @@ export function PlayerView({
     return name
   }, [item, multi])
 
-  const meta = useCallback(
-    (): ExportMeta => ({
-      title: baseName(),
-      artist: item?.owner ?? '',
-      comment: item?.bvid || `av${item?.avid ?? ''}`,
-      date: item?.createdAt ? String(new Date(item.createdAt).getFullYear()) : undefined,
-    }),
-    [item, baseName],
-  )
-
-  // 完整视频（混流）：需整段读入内存交给 ffmpeg 合成，超大文件受内存限制
+  // 完整视频（混流）：流式合并音画到磁盘，边拉边写、内存只驻留单个分片，可处理任意大小
   const runMux = useCallback(async () => {
     if (!item) return
     setExporting('mux')
-    setExportRatio(0)
     setExportNote('')
-    const tid = toast.loading('读取媒体并合成…')
-    try {
-      let video: Uint8Array
-      let audio: Uint8Array
-      let cover: Uint8Array | undefined
+    const filename = `${safeFilename(baseName())}.mp4`
+    const openStream = async (kind: 'video' | 'audio'): Promise<StreamSource> => {
       if (source === 'sample') {
-        const b = `${import.meta.env.BASE_URL}demo/`
-        ;[video, audio, cover] = await Promise.all([
-          fetchBytes(`${b}video.m4s`),
-          fetchBytes(`${b}audio.m4s`),
-          fetchBytes(`${b}cover.jpg`).catch(() => undefined),
-        ])
-      } else {
-        if (!connection) throw new Error('设备连接已断开')
-        const bundle = await readMedia(connection.adb, packageName, item, (s, n) =>
-          setExportNote(`读取${s === 'video' ? '视频' : '音频'} ${formatBytes(n)}`),
-        )
-        video = bundle.video
-        audio = bundle.audio
-        cover = item.cover ? await fetchBytes(item.cover).catch(() => undefined) : undefined
+        const res = await fetch(`${import.meta.env.BASE_URL}demo/${kind}.m4s`)
+        if (!res.body) throw new Error('示例媒体加载失败')
+        return { stream: res.body as unknown as ByteStream }
       }
-      const totalMb = (video.length + audio.length) / 1e6
-      if (totalMb > 700) {
-        toast.warning('文件较大，合成可能因内存不足失败', {
-          description: `约 ${totalMb.toFixed(0)} MB，可改用「仅画面 / 仅音频」流式保存。`,
-        })
-      }
-      setExportNote('')
-      await loadFfmpeg()
-      const out = await exportMuxed(video, audio, meta(), cover, (p) => setExportRatio(p.ratio))
-      downloadBytes(out, `${safeFilename(baseName())}.mp4`, 'video/mp4')
-      toast.success('已导出到本地', { id: tid })
+      if (!connection) throw new Error('设备连接已断开')
+      return openMediaFile(connection.adb, packageName, item, kind)
+    }
+    try {
+      const result = await saveWith(filename, 'video/mp4', async (write) => {
+        const v = await openStream('video')
+        const a = await openStream('audio')
+        try {
+          await remuxFmp4(v.stream, a.stream, write, (b) => setExportNote(`已合成 ${formatBytes(b)}`))
+        } finally {
+          await v.dispose?.()
+          await a.dispose?.()
+        }
+      })
+      if (result === 'saved') toast.success('已保存到本地')
     } catch (err) {
-      toast.error('导出失败', { id: tid, description: (err as Error).message })
+      toast.error('合成失败', { description: (err as Error).message })
     } finally {
       setExporting(null)
-      setExportRatio(0)
       setExportNote('')
     }
-  }, [item, source, connection, packageName, meta, baseName])
+  }, [item, source, connection, packageName, baseName])
 
   // 仅画面 / 仅音频：请求浏览器保存，再从手机边拉边写磁盘，内存不驻留整段
   const runStreamSave = useCallback(
@@ -442,18 +412,11 @@ export function PlayerView({
             弹幕
           </Button>
         </div>
-        {busyExport &&
-          (exporting === 'mux' ? (
-            <div className="flex flex-col gap-1">
-              <Progress value={exportRatio > 0 ? exportRatio * 100 : null} />
-              {exportNote && <div className="text-xs text-muted-foreground">{exportNote}</div>}
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">{exportNote || '准备保存…'}</div>
-          ))}
+        {busyExport && (
+          <div className="text-xs text-muted-foreground">{exportNote || '准备保存…'}</div>
+        )}
         <p className="text-[11px] text-muted-foreground/70">
-          「完整视频」合成音画并写入标题 / UP 主 / 封面，需读入内存，超大文件可能失败；
-          「仅画面 / 仅音频」边拉边存到磁盘，可保存超大文件。时长{' '}
+          三者都是边从手机拉取、边写入磁盘（先选保存位置），内存不驻留整段，可保存超大文件。时长{' '}
           {item ? formatDuration(item.durationMs) : '—'}。
         </p>
       </div>

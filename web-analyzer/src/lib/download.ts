@@ -2,7 +2,7 @@
  * 本地保存工具。
  *  - saveStreamed：请求浏览器开始下载（File System Access API），再从手机/网络
  *    边拉边写到磁盘，内存不驻留整段，可保存超大文件；不支持该 API 时回退到内存 Blob。
- *  - downloadBytes：把已在内存中的字节直接触发下载（用于 ffmpeg 合成后的结果）。
+ *  - downloadBytes：把已在内存中的字节直接触发下载（用于弹幕等小文件）。
  */
 import type { ByteStream } from './media'
 
@@ -92,6 +92,33 @@ export interface StreamSource {
   stream: ByteStream
   /** 读取结束后清理（如关闭 ADB sync 会话）。 */
   dispose?: () => Promise<void>
+}
+
+/**
+ * 通用流式保存：先请求保存位置，再把 write 回调交给 produce 逐块写入磁盘。
+ * 用于需要多路输入合成单一输出的场景（如混流）。
+ * @returns 'saved' 成功；'cancelled' 用户取消了保存对话框。
+ */
+export async function saveWith(
+  filename: string,
+  mime: string,
+  produce: (write: (chunk: Uint8Array) => Promise<void>) => Promise<void>,
+): Promise<'saved' | 'cancelled'> {
+  let sink: SaveSink
+  try {
+    sink = await openSaveSink(filename, mime)
+  } catch (err) {
+    if ((err as DOMException).name === 'AbortError') return 'cancelled'
+    throw err
+  }
+  try {
+    await produce((chunk) => sink.write(chunk))
+    await sink.close()
+    return 'saved'
+  } catch (err) {
+    await sink.abort().catch(() => {})
+    throw err
+  }
 }
 
 /**
