@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Header } from '@/components/Header'
 import { Onboarding } from '@/components/Onboarding'
 import { Toolbar } from '@/components/Toolbar'
-import { Report } from '@/components/Report'
+import { Report, type ReportLayout } from '@/components/Report'
 import { AppContext } from '@/store'
 import {
   connect,
@@ -39,6 +39,7 @@ function AppInner() {
   const [report, setReport] = useState<CacheReport | null>(null)
   const [source, setSource] = useState<Source | null>(null)
   const [busy, setBusy] = useState(false)
+  const [layout, setLayout] = useState<ReportLayout>('side')
   const [progress, setProgress] = useState<ScanProgress | null>(null)
   const [skipped, setSkipped] = useState(0)
 
@@ -157,10 +158,12 @@ function AppInner() {
           itemCount={report.itemCount}
           skipped={skipped}
           busy={busy}
+          layout={layout}
+          onToggleLayout={() => setLayout((l) => (l === 'side' ? 'below' : 'side'))}
           onRescan={handleRescan}
           onReset={handleReset}
         />
-        <Report report={report} onPlay={openPlayer} />
+        <Report report={report} onPlay={openPlayer} layout={layout} />
       </div>
     ) : (
       <Onboarding

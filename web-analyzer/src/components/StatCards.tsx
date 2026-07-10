@@ -3,6 +3,7 @@ import { HardDriveIcon, ClockIcon, MessageSquareIcon, FilmIcon } from 'lucide-re
 import { Card } from '@/components/ui/card'
 import type { CacheReport } from '@/lib/bili'
 import { formatBytes, formatLongDuration } from '@/lib/bili'
+import { cn } from '@/lib/utils'
 
 function StatCard({
   icon: Icon,
@@ -35,13 +36,13 @@ function StatCard({
   )
 }
 
-export function StatCards({ report }: { report: CacheReport }) {
+export function StatCards({ report, dense = false }: { report: CacheReport; dense?: boolean }) {
   const dur = formatLongDuration(report.totalDurationMs)
   const [durMain, durUnit] = dur.includes('h') ? [dur, ''] : [dur.split(' ')[0], dur.split(' ')[1] ?? '']
   const size = formatBytes(report.downloadedBytes)
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-2">
+    <div className={cn('grid grid-cols-2 gap-3 lg:grid-cols-4', dense && 'xl:grid-cols-2')}>
       <StatCard
         icon={FilmIcon}
         value={String(report.itemCount)}

@@ -71,9 +71,12 @@ type Filter = 'all' | 'vip' | 'charge'
 export function VideoTable({
   report,
   onPlay,
+  fill = false,
 }: {
   report: CacheReport
   onPlay: (item: CacheItem) => void
+  /** 宽屏两栏时填满父容器高度（父容器为概览高度），列表内部滚动、不撑高整行。 */
+  fill?: boolean
 }) {
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -96,8 +99,13 @@ export function VideoTable({
   const items = report.items.filter(match)
 
   return (
-    <Card className="gap-0 overflow-hidden py-0 xl:h-full">
-      <Tabs defaultValue="videos" className="gap-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+    <Card
+      className={cn('gap-0 overflow-hidden py-0', fill && 'xl:absolute xl:inset-0 xl:h-auto')}
+    >
+      <Tabs
+        defaultValue="videos"
+        className={cn('gap-0', fill && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col')}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -139,8 +147,16 @@ export function VideoTable({
         </div>
 
         {/* 按视频（投稿）分组 */}
-        <TabsContent value="videos" className="m-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
-          <div className="max-h-[560px] overflow-auto xl:max-h-none xl:min-h-0 xl:flex-1">
+        <TabsContent
+          value="videos"
+          className={cn('m-0', fill && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col')}
+        >
+          <div
+            className={cn(
+              'max-h-[560px] overflow-auto',
+              fill && 'xl:max-h-none xl:min-h-0 xl:flex-1',
+            )}
+          >
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -209,8 +225,16 @@ export function VideoTable({
         </TabsContent>
 
         {/* 按条目（分P/分集） */}
-        <TabsContent value="items" className="m-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
-          <div className="max-h-[560px] overflow-auto xl:max-h-none xl:min-h-0 xl:flex-1">
+        <TabsContent
+          value="items"
+          className={cn('m-0', fill && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col')}
+        >
+          <div
+            className={cn(
+              'max-h-[560px] overflow-auto',
+              fill && 'xl:max-h-none xl:min-h-0 xl:flex-1',
+            )}
+          >
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>

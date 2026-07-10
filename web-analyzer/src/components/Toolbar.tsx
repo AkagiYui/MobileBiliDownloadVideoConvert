@@ -1,5 +1,14 @@
-import { RefreshCwIcon, XIcon, DatabaseIcon, HardDriveIcon, Loader2Icon } from 'lucide-react'
+import {
+  RefreshCwIcon,
+  XIcon,
+  DatabaseIcon,
+  HardDriveIcon,
+  Loader2Icon,
+  PanelRightIcon,
+  PanelBottomIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { ReportLayout } from './Report'
 
 export function Toolbar({
   source,
@@ -7,6 +16,8 @@ export function Toolbar({
   itemCount,
   skipped,
   busy,
+  layout,
+  onToggleLayout,
   onRescan,
   onReset,
 }: {
@@ -15,6 +26,8 @@ export function Toolbar({
   itemCount: number
   skipped: number
   busy: boolean
+  layout: ReportLayout
+  onToggleLayout: () => void
   onRescan: () => void
   onReset: () => void
 }) {
@@ -26,9 +39,7 @@ export function Toolbar({
         ) : (
           <HardDriveIcon className="size-4 text-bili-pink" />
         )}
-        <span className="text-sm font-medium">
-          {source === 'sample' ? '示例数据' : '设备缓存'}
-        </span>
+        <span className="text-sm font-medium">{source === 'sample' ? '示例数据' : '设备缓存'}</span>
       </div>
       <span className="font-mono text-xs text-muted-foreground">{packageName}</span>
       <span className="text-xs text-muted-foreground">
@@ -36,6 +47,21 @@ export function Toolbar({
       </span>
 
       <div className="ml-auto flex items-center gap-2">
+        {/* 布局切换：仅宽屏显示（窄屏恒为堆叠）。图标表示切换后的位置 */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onToggleLayout}
+          aria-label={layout === 'side' ? '清单移到下方' : '清单移到右侧'}
+          title={layout === 'side' ? '清单移到下方' : '清单移到右侧'}
+          className="hidden size-8 xl:inline-flex"
+        >
+          {layout === 'side' ? (
+            <PanelBottomIcon className="size-4" />
+          ) : (
+            <PanelRightIcon className="size-4" />
+          )}
+        </Button>
         {source === 'device' && (
           <Button variant="outline" size="sm" onClick={onRescan} disabled={busy} className="gap-1.5">
             {busy ? (
