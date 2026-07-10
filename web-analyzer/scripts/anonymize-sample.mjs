@@ -66,7 +66,24 @@ const out = items.map((it, idx) => {
   }
 })
 
+// 演示用：把少量单P条目标记为大会员专享画质（1080P60 / 1080P+）。
+// 示例数据本就是合成/脱敏的，这样才能在无真机时演示「大会员专享」区分与筛选。
+const avidCount = new Map()
+for (const it of out) avidCount.set(it.avid, (avidCount.get(it.avid) || 0) + 1)
+const vipTargets = out.filter((it) => avidCount.get(it.avid) === 1 && it.quality === 80).slice(0, 3)
+const vipPlan = [
+  { quality: 116, qualityLabel: '1080P60' },
+  { quality: 116, qualityLabel: '1080P60' },
+  { quality: 112, qualityLabel: '1080P+' },
+]
+vipTargets.forEach((it, i) => {
+  Object.assign(it, vipPlan[i], { isVip: true })
+})
+
 writeFileSync(file, JSON.stringify(out))
+const vip = out.filter((x) => x.isVip).length
+const charge = out.filter((x) => x.isCharge).length
 console.log(
-  `[anonymize-sample] 已脱敏 ${out.length} 条 → public/sample-items.json（${avidOrder.length} 个投稿，${ownersByFreq.length} 位UP主）`,
+  `[anonymize-sample] 已脱敏 ${out.length} 条 → public/sample-items.json` +
+    `（${avidOrder.length} 投稿 / ${ownersByFreq.length} UP主 / 充电 ${charge} / 大会员 ${vip}）`,
 )

@@ -75,6 +75,8 @@ export interface CacheItem {
   completed: boolean
   isDash: boolean
   isCharge: boolean
+  /** 是否缓存于大会员专享画质（1080P+/1080P60/4K/HDR/杜比/8K 等）。 */
+  isVip: boolean
   isSeason: boolean
   createdAt: number
   mediaType: number
@@ -106,6 +108,16 @@ export function qualityTier(code: number): 'hd' | 'sd' | 'low' {
   if (code >= 80) return 'hd'
   if (code >= 64) return 'sd'
   return 'low'
+}
+
+/**
+ * 大会员专享画质档：720P60(74)、1080P+高码率(112)、1080P60(116)、4K(120)、
+ * HDR(125)、杜比视界(126)、8K(127)。这些画质只有大会员可缓存，因此以此判定
+ * “大会员专享”。（实测 entry.json 无独立 VIP 字段，仅靠画质档与 quality_superscript 区分。）
+ */
+const VIP_QUALITIES = new Set([74, 112, 116, 120, 125, 126, 127])
+export function isVipQuality(code: number): boolean {
+  return VIP_QUALITIES.has(code)
 }
 
 const MEDIA_TYPE_MAP: Record<number, string> = {
@@ -159,6 +171,7 @@ export function parseEntry(raw: RawEntry, path: string): CacheItem {
     isCharge:
       (raw.is_charge_video ?? false) ||
       (raw.season_access_info != null && Object.keys(raw.season_access_info).length > 0),
+    isVip: VIP_QUALITIES.has(quality),
     isSeason,
     createdAt: raw.time_create_stamp ?? 0,
     mediaType: raw.media_type ?? 0,
@@ -190,6 +203,7 @@ export interface CacheReport {
   dashCount: number
   legacyCount: number
   chargeCount: number
+  vipCount: number
   earliest: number
   latest: number
   qualities: Distribution[]
@@ -216,6 +230,7 @@ export interface VideoGroup {
   createdAt: number
   isSeason: boolean
   isCharge: boolean
+  isVip: boolean
 }
 
 function tallyToSorted(map: Map<string, { count: number; weight: number }>): Distribution[] {
@@ -242,6 +257,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
   let completedCount = 0
   let dashCount = 0
   let chargeCount = 0
+  let vipCount = 0
   let earliest = Number.POSITIVE_INFINITY
   let latest = 0
 
@@ -267,6 +283,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
     if (it.completed) completedCount += 1
     if (it.isDash) dashCount += 1
     if (it.isCharge) chargeCount += 1
+    if (it.isVip) vipCount += 1
     if (it.createdAt > 0) {
       if (it.createdAt < earliest) earliest = it.createdAt
       if (it.createdAt > latest) latest = it.createdAt
@@ -285,6 +302,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
       g.danmaku += it.danmaku
       if (!it.completed) g.completed = false
       if (it.isCharge) g.isCharge = true
+      if (it.isVip) g.isVip = true
       if (it.createdAt > 0 && (g.createdAt === 0 || it.createdAt > g.createdAt)) {
         g.createdAt = it.createdAt
       }
@@ -304,6 +322,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
         createdAt: it.createdAt,
         isSeason: it.isSeason,
         isCharge: it.isCharge,
+        isVip: it.isVip,
       })
     }
   }
@@ -329,6 +348,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
     dashCount,
     legacyCount: items.length - dashCount,
     chargeCount,
+    vipCount,
     earliest: Number.isFinite(earliest) ? earliest : 0,
     latest,
     qualities: tallyToSorted(qualityMap),

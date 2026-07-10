@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayersIcon, PlayIcon, ZapIcon } from 'lucide-react'
+import { LayersIcon, PlayIcon, ZapIcon, CrownIcon } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -54,9 +54,19 @@ function ChargeBadge() {
   )
 }
 
+/** 大会员专享画质标记。 */
+function VipBadge() {
+  return (
+    <span className="mr-1.5 inline-flex h-4 items-center gap-0.5 rounded bg-bili-pink px-1 align-middle text-[9px] font-medium text-white">
+      <CrownIcon className="size-2.5" />
+      大会员
+    </span>
+  )
+}
+
 const TH = 'h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
 
-type Filter = 'all' | 'charge'
+type Filter = 'all' | 'vip' | 'charge'
 
 export function VideoTable({
   report,
@@ -66,7 +76,13 @@ export function VideoTable({
   onPlay: (item: CacheItem) => void
 }) {
   const [filter, setFilter] = useState<Filter>('all')
-  const hasCharge = report.chargeCount > 0
+
+  // 可用的筛选项：全部 + 存在时才显示的 大会员 / 充电
+  const filters: { key: Filter; label: string; icon?: typeof CrownIcon }[] = [
+    { key: 'all', label: '全部' },
+    ...(report.vipCount > 0 ? [{ key: 'vip' as const, label: '大会员', icon: CrownIcon }] : []),
+    ...(report.chargeCount > 0 ? [{ key: 'charge' as const, label: '充电', icon: ZapIcon }] : []),
+  ]
 
   // avid → 该投稿的首个条目，用于「按视频」行的播放
   const firstItemByAvid = new Map<string, CacheItem>()
@@ -74,8 +90,10 @@ export function VideoTable({
     if (!firstItemByAvid.has(it.avid)) firstItemByAvid.set(it.avid, it)
   }
 
-  const videos = filter === 'charge' ? report.videos.filter((v) => v.isCharge) : report.videos
-  const items = filter === 'charge' ? report.items.filter((i) => i.isCharge) : report.items
+  const match = (x: { isVip: boolean; isCharge: boolean }) =>
+    filter === 'vip' ? x.isVip : filter === 'charge' ? x.isCharge : true
+  const videos = report.videos.filter(match)
+  const items = report.items.filter(match)
 
   return (
     <Card className="gap-0 overflow-hidden py-0 xl:h-full">
@@ -85,31 +103,28 @@ export function VideoTable({
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               缓存清单
             </div>
-            {hasCharge && (
+            {filters.length > 1 && (
               <div className="inline-flex rounded-md bg-muted p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setFilter('all')}
-                  className={cn(
-                    'rounded px-2 py-0.5 transition-colors',
-                    filter === 'all' ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground',
-                  )}
-                >
-                  全部
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilter('charge')}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
-                    filter === 'charge'
-                      ? 'bg-background font-medium text-warning shadow-sm'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  <ZapIcon className="size-3" />
-                  充电
-                </button>
+                {filters.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setFilter(f.key)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
+                      filter === f.key
+                        ? cn(
+                            'bg-background font-medium shadow-sm',
+                            f.key === 'charge' && 'text-warning',
+                            f.key === 'vip' && 'text-bili-pink',
+                          )
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    {f.icon && <f.icon className="size-3" />}
+                    {f.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -151,6 +166,7 @@ export function VideoTable({
                         {formatDate(v.createdAt)}
                       </TableCell>
                       <TableCell className="max-w-[280px] truncate font-medium" title={v.title}>
+                        {v.isVip && <VipBadge />}
                         {v.isCharge && <ChargeBadge />}
                         {v.isSeason && (
                           <Badge variant="outline" className="mr-1.5 h-4 px-1 text-[9px]">
@@ -218,6 +234,7 @@ export function VideoTable({
                       P{it.page || '?'}
                     </TableCell>
                     <TableCell className="max-w-[280px] truncate" title={it.part || it.title}>
+                      {it.isVip && <VipBadge />}
                       {it.isCharge && <ChargeBadge />}
                       {it.part || it.title}
                     </TableCell>

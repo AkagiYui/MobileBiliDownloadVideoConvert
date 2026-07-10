@@ -39,6 +39,15 @@ export function SummaryCard({ report }: { report: CacheReport }) {
             {report.completedCount}/{report.itemCount}
           </Badge>
         </Row>
+        <Row k="大会员专享">
+          {report.vipCount > 0 ? (
+            <Badge variant="secondary" className="bg-bili-pink/15 text-bili-pink">
+              {report.vipCount} 个
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">无</span>
+          )}
+        </Row>
         <Row k="充电视频">
           {report.chargeCount > 0 ? (
             <Badge variant="secondary" className="bg-warning/15 text-warning">
