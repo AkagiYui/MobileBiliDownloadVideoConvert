@@ -77,7 +77,7 @@ export function VideoTable({
 
         {/* 按视频（投稿）分组 */}
         <TabsContent value="videos" className="m-0">
-          <div className="max-h-[560px] overflow-auto">
+          <div className="max-h-[560px] overflow-auto xl:max-h-[78vh]">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -145,7 +145,7 @@ export function VideoTable({
 
         {/* 按条目（分P/分集） */}
         <TabsContent value="items" className="m-0">
-          <div className="max-h-[560px] overflow-auto">
+          <div className="max-h-[560px] overflow-auto xl:max-h-[78vh]">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>

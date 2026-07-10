@@ -62,8 +62,8 @@ function AppInner() {
     try {
       const result = await scanCache(conn.adb, pkg, setProgress)
       if (result.items.length === 0) {
-        toast.error('未发现缓存条目', {
-          description: `${pkg} 下没有可解析的 entry.json，请确认该应用已缓存视频。`,
+        toast.error('没有找到缓存视频', {
+          description: '请确认这台手机的哔哩哔哩里已经离线缓存过视频。',
         })
         return
       }
@@ -197,7 +197,7 @@ function AppInner() {
         </Routes>
 
         <footer className="mx-auto max-w-6xl px-6 pb-10 pt-4 text-center text-[11px] text-muted-foreground/60">
-          纯前端 · 数据不离开本机 · 基于 WebUSB + ya-webadb + ffmpeg.wasm
+          全部在本地完成 · 不上传任何数据
         </footer>
       </div>
     </AppContext.Provider>

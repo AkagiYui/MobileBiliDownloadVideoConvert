@@ -35,13 +35,8 @@ export function Header({ device }: { device: DeviceInfo | null }) {
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <BiliMark />
         <div className="mr-auto leading-tight">
-          <div className="flex items-center gap-2 font-semibold tracking-tight">
-            哔哩哔哩缓存分析器
-            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
-              WebUSB
-            </span>
-          </div>
-          <div className="font-mono text-[11px] text-muted-foreground">tv.danmaku.bili · 浏览器内直连</div>
+          <div className="font-semibold tracking-tight">哔哩哔哩缓存分析器</div>
+          <div className="text-[11px] text-muted-foreground">离线缓存 · 分析 · 播放 · 导出</div>
         </div>
 
         {device && (
@@ -56,11 +51,11 @@ export function Header({ device }: { device: DeviceInfo | null }) {
         )}
 
         <a
-          href="https://github.com/yume-chan/ya-webadb"
+          href="https://github.com/AkagiYui/MobileBiliDownloadVideoConvert"
           target="_blank"
           rel="noreferrer"
           className="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          aria-label="ya-webadb 项目"
+          aria-label="项目仓库"
         >
           <GithubMark />
         </a>

@@ -22,14 +22,14 @@ export function SummaryCard({ report }: { report: CacheReport }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Row k="缓存格式">
+        <Row k="视频格式">
           {report.legacyCount === 0 ? (
             <Badge variant="secondary" className="bg-success/15 text-success">
-              DASH 音视频分离
+              新版
             </Badge>
           ) : (
-            <span className="font-mono text-xs">
-              DASH {report.dashCount} · FLV {report.legacyCount}
+            <span className="text-xs">
+              新版 {report.dashCount} · 旧版 {report.legacyCount}
             </span>
           )}
         </Row>

@@ -27,7 +27,7 @@ export default function PlayerPage() {
         <div>
           <div className="font-medium">没有可播放的内容</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {report ? '未找到该视频，可能已返回首页重新扫描。' : '播放数据来自内存，刷新后需返回首页重新连接/扫描。'}
+            {report ? '未找到该视频，请返回首页重新选择。' : '刷新后数据会丢失，请返回首页重新连接手机并扫描。'}
           </p>
         </div>
         <Button onClick={() => navigate('/')} className="gap-1.5">

@@ -11,6 +11,7 @@ import {
   DownloadIcon,
   ListVideoIcon,
   ArrowLeftIcon,
+  MessageSquareIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -66,11 +67,12 @@ export function PlayerView({
   const artRef = useRef<Artplayer | null>(null)
 
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [loadNote, setLoadNote] = useState('打开媒体流…')
+  const [loadNote, setLoadNote] = useState('加载中…')
   const [errorMsg, setErrorMsg] = useState('')
   const [playbackWarning, setPlaybackWarning] = useState('')
   const [exporting, setExporting] = useState<ExportKind | null>(null)
   const [exportRatio, setExportRatio] = useState(0)
+  const [danmakuXml, setDanmakuXml] = useState('')
 
   useEffect(() => setIndex(startIndex), [startIndex, playlist])
 
@@ -83,13 +85,14 @@ export function PlayerView({
     let dispose: (() => Promise<void>) | null = null
 
     setPhase('loading')
-    setLoadNote('打开媒体流…')
+    setLoadNote('加载中…')
     setErrorMsg('')
     setPlaybackWarning('')
+    setDanmakuXml('')
 
     const run = async () => {
       if (!item.isDash) {
-        throw new Error('该缓存为旧版 FLV 分段格式，暂不支持在线播放。')
+        throw new Error('这个视频是旧格式，暂不支持在线播放。')
       }
       let videoStream: ByteStream
       let audioStream: ByteStream
@@ -119,6 +122,7 @@ export function PlayerView({
         return
       }
 
+      setDanmakuXml(danmakuText)
       const danmakuItems = danmakuText ? parseDanmaku(danmakuText) : []
 
       art = new Artplayer({
@@ -141,10 +145,10 @@ export function PlayerView({
             } catch (err) {
               if (err instanceof UnsupportedCodecError) {
                 setPlaybackWarning(
-                  `${err.message}。播放需浏览器/系统支持该编码（如 HEVC 需硬件解码），但导出到本地不受影响。`,
+                  '当前设备无法播放这个视频的画面格式，但仍可下载到本地，用其他播放器观看。',
                 )
               } else {
-                setPlaybackWarning(`播放初始化失败：${(err as Error).message}`)
+                setPlaybackWarning(`无法播放：${(err as Error).message}`)
               }
               setPhase('ready')
             }
@@ -209,7 +213,7 @@ export function PlayerView({
     }
     if (!connection) throw new Error('设备连接已断开')
     const bundle = await readMedia(connection.adb, packageName, item, (stream, n) =>
-      setLoadNote(`读取${stream === 'video' ? '视频' : '音频'}流 ${formatBytes(n)}`),
+      setLoadNote(`读取${stream === 'video' ? '视频' : '音频'} ${formatBytes(n)}`),
     )
     const cover = item.cover ? await fetchBytes(item.cover).catch(() => undefined) : undefined
     return { video: bundle.video, audio: bundle.audio, cover }
@@ -250,6 +254,13 @@ export function PlayerView({
     },
     [item, loadFullBytes, meta],
   )
+
+  const downloadDanmaku = useCallback(() => {
+    if (!danmakuXml || !item) return
+    const name = safeFilename(meta().title)
+    downloadBytes(new TextEncoder().encode(danmakuXml), `${name}.弹幕.xml`, 'application/xml')
+    toast.success('已保存弹幕文件')
+  }, [danmakuXml, item, meta])
 
   const busyExport = exporting !== null
 
@@ -344,13 +355,13 @@ export function PlayerView({
         </div>
       )}
 
-      {/* 导出 */}
+      {/* 保存到本地 */}
       <div className="mt-5 flex flex-col gap-2 rounded-xl border bg-card p-4">
         <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <DownloadIcon className="size-3.5" />
-          保存到本地（ffmpeg.wasm 重封装 · 嵌入元数据与封面）
+          保存到本地（自动写入标题、UP 主等信息与封面）
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Button
             variant="outline"
             disabled={!item || busyExport}
@@ -362,7 +373,7 @@ export function PlayerView({
             ) : (
               <FilmIcon className="size-4 text-bili-pink" />
             )}
-            混流 MP4
+            完整视频
           </Button>
           <Button
             variant="outline"
@@ -375,7 +386,7 @@ export function PlayerView({
             ) : (
               <FileVideoIcon className="size-4" />
             )}
-            仅视频流
+            仅画面
           </Button>
           <Button
             variant="outline"
@@ -388,13 +399,23 @@ export function PlayerView({
             ) : (
               <FileAudioIcon className="size-4" />
             )}
-            仅音频流
+            仅音频
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!danmakuXml || busyExport}
+            onClick={downloadDanmaku}
+            className="justify-start gap-2"
+            title={danmakuXml ? undefined : '这个视频没有弹幕'}
+          >
+            <MessageSquareIcon className="size-4 text-bili-blue" />
+            弹幕
           </Button>
         </div>
         {busyExport && <Progress value={exportRatio > 0 ? exportRatio * 100 : null} />}
         <p className="text-[11px] text-muted-foreground/70">
-          播放为流式加载（内存受限于缓冲窗口，可播放大文件）；导出需按需读取整段，
-          超大文件受浏览器内存限制。当前时长 {item ? formatDuration(item.durationMs) : '—'}。
+          视频边下边播，大文件也能顺畅观看；保存时需要完整读取，文件很大时会慢一些。 时长{' '}
+          {item ? formatDuration(item.durationMs) : '—'}。
         </p>
       </div>
     </div>

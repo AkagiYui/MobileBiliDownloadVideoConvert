@@ -41,7 +41,7 @@ export function StatCards({ report }: { report: CacheReport }) {
   const size = formatBytes(report.downloadedBytes)
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-2">
       <StatCard
         icon={FilmIcon}
         value={String(report.itemCount)}
