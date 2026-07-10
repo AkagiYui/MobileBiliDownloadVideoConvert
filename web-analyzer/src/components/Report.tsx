@@ -43,9 +43,9 @@ export function Report({
   onPlay: (item: CacheItem) => void
 }) {
   return (
-    // 宽屏(≥xl)：左侧概览 + 右侧缓存清单；窄屏：概览在上、清单在下（保持原布局）
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-      <div className="flex flex-col gap-4 xl:w-[460px] xl:shrink-0">
+    // 宽屏(≥xl)：左侧概览 + 右侧缓存清单（两栏等高）；窄屏：上下堆叠（保持原布局）
+    <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[460px_minmax(0,1fr)] xl:items-stretch">
+      <div className="flex flex-col gap-4">
         <StatCards report={report} />
 
         <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-1">
@@ -74,7 +74,7 @@ export function Report({
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <VideoTable report={report} onPlay={onPlay} />
       </div>
     </div>

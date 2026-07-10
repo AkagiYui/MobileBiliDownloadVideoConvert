@@ -32,6 +32,8 @@ export interface RawEntry {
   owner_name?: string
   owner_avatar?: string
   is_charge_video?: boolean
+  /** 充电专属视频会带上此字段（形如 {"<mid>": "100"}），普通视频没有。 */
+  season_access_info?: Record<string, string> | null
   season_id?: number
   page_data?: {
     cid?: number
@@ -154,7 +156,9 @@ export function parseEntry(raw: RawEntry, path: string): CacheItem {
     downloadedBytes: raw.downloaded_bytes ?? 0,
     completed: raw.is_completed ?? false,
     isDash: raw.has_dash_audio ?? false,
-    isCharge: raw.is_charge_video ?? false,
+    isCharge:
+      (raw.is_charge_video ?? false) ||
+      (raw.season_access_info != null && Object.keys(raw.season_access_info).length > 0),
     isSeason,
     createdAt: raw.time_create_stamp ?? 0,
     mediaType: raw.media_type ?? 0,
@@ -211,6 +215,7 @@ export interface VideoGroup {
   completed: boolean
   createdAt: number
   isSeason: boolean
+  isCharge: boolean
 }
 
 function tallyToSorted(map: Map<string, { count: number; weight: number }>): Distribution[] {
@@ -279,6 +284,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
       g.totalDurationMs += it.durationMs
       g.danmaku += it.danmaku
       if (!it.completed) g.completed = false
+      if (it.isCharge) g.isCharge = true
       if (it.createdAt > 0 && (g.createdAt === 0 || it.createdAt > g.createdAt)) {
         g.createdAt = it.createdAt
       }
@@ -297,6 +303,7 @@ export function aggregate(items: CacheItem[]): CacheReport {
         completed: it.completed,
         createdAt: it.createdAt,
         isSeason: it.isSeason,
+        isCharge: it.isCharge,
       })
     }
   }

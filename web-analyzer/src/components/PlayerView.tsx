@@ -163,6 +163,7 @@ export function PlayerView({
                   opacity: 1,
                   fontSize: 22,
                   margin: [10, '25%'],
+                  emitter: false, // 关闭发弹幕输入框，仅保留显示开关与设置
                 }),
               ]
             : [],

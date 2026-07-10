@@ -39,7 +39,7 @@ export function SummaryCard({ report }: { report: CacheReport }) {
             {report.completedCount}/{report.itemCount}
           </Badge>
         </Row>
-        <Row k="付费视频">
+        <Row k="充电视频">
           {report.chargeCount > 0 ? (
             <Badge variant="secondary" className="bg-warning/15 text-warning">
               {report.chargeCount} 个

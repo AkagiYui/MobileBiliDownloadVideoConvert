@@ -1,4 +1,5 @@
-import { LayersIcon, PlayIcon } from 'lucide-react'
+import { useState } from 'react'
+import { LayersIcon, PlayIcon, ZapIcon } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -43,7 +44,19 @@ function QualityBadge({ code, label }: { code: number; label: string }) {
   )
 }
 
+/** 充电专属视频标记。 */
+function ChargeBadge() {
+  return (
+    <span className="mr-1.5 inline-flex h-4 items-center gap-0.5 rounded border border-warning/50 px-1 align-middle text-[9px] font-medium text-warning">
+      <ZapIcon className="size-2.5" />
+      充电
+    </span>
+  )
+}
+
 const TH = 'h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
+
+type Filter = 'all' | 'charge'
 
 export function VideoTable({
   report,
@@ -52,32 +65,67 @@ export function VideoTable({
   report: CacheReport
   onPlay: (item: CacheItem) => void
 }) {
+  const [filter, setFilter] = useState<Filter>('all')
+  const hasCharge = report.chargeCount > 0
+
   // avid → 该投稿的首个条目，用于「按视频」行的播放
   const firstItemByAvid = new Map<string, CacheItem>()
   for (const it of report.items) {
     if (!firstItemByAvid.has(it.avid)) firstItemByAvid.set(it.avid, it)
   }
 
+  const videos = filter === 'charge' ? report.videos.filter((v) => v.isCharge) : report.videos
+  const items = filter === 'charge' ? report.items.filter((i) => i.isCharge) : report.items
+
   return (
-    <Card className="gap-0 overflow-hidden py-0">
-      <Tabs defaultValue="videos" className="gap-0">
+    <Card className="gap-0 overflow-hidden py-0 xl:h-full">
+      <Tabs defaultValue="videos" className="gap-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            缓存清单
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              缓存清单
+            </div>
+            {hasCharge && (
+              <div className="inline-flex rounded-md bg-muted p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFilter('all')}
+                  className={cn(
+                    'rounded px-2 py-0.5 transition-colors',
+                    filter === 'all' ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground',
+                  )}
+                >
+                  全部
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('charge')}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded px-2 py-0.5 transition-colors',
+                    filter === 'charge'
+                      ? 'bg-background font-medium text-warning shadow-sm'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  <ZapIcon className="size-3" />
+                  充电
+                </button>
+              </div>
+            )}
           </div>
           <TabsList>
             <TabsTrigger value="videos" className="text-xs">
-              按视频 · {report.videoCount}
+              按视频 · {videos.length}
             </TabsTrigger>
             <TabsTrigger value="items" className="text-xs">
-              按条目 · {report.itemCount}
+              按条目 · {items.length}
             </TabsTrigger>
           </TabsList>
         </div>
 
         {/* 按视频（投稿）分组 */}
-        <TabsContent value="videos" className="m-0">
-          <div className="max-h-[560px] overflow-auto xl:max-h-[78vh]">
+        <TabsContent value="videos" className="m-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+          <div className="max-h-[560px] overflow-auto xl:max-h-none xl:min-h-0 xl:flex-1">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -92,50 +140,51 @@ export function VideoTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {report.videos.map((v) => {
+                {videos.map((v) => {
                   const first = firstItemByAvid.get(v.avid)
                   return (
-                  <TableRow key={v.avid} className="text-sm">
-                    <TableCell className="pr-0">
-                      {first && <PlayButton onClick={() => onPlay(first)} />}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-                      {formatDate(v.createdAt)}
-                    </TableCell>
-                    <TableCell className="max-w-[280px] truncate font-medium" title={v.title}>
-                      {v.isSeason && (
-                        <Badge variant="outline" className="mr-1.5 h-4 px-1 text-[9px]">
-                          番剧
-                        </Badge>
-                      )}
-                      {v.title}
-                    </TableCell>
-                    <TableCell
-                      className="hidden max-w-[120px] truncate text-muted-foreground sm:table-cell"
-                      title={v.owner}
-                    >
-                      {v.owner}
-                    </TableCell>
-                    <TableCell>
-                      <QualityBadge code={v.quality} label={v.qualityLabel} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted-foreground">
-                      {formatBytes(v.totalBytes)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right font-mono text-xs tabular-nums">
-                      {formatDuration(v.totalDurationMs)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {v.pages > 1 ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold">
-                          <LayersIcon className="size-2.5" />
-                          {v.pages}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                    <TableRow key={v.avid} className="text-sm">
+                      <TableCell className="pr-0">
+                        {first && <PlayButton onClick={() => onPlay(first)} />}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                        {formatDate(v.createdAt)}
+                      </TableCell>
+                      <TableCell className="max-w-[280px] truncate font-medium" title={v.title}>
+                        {v.isCharge && <ChargeBadge />}
+                        {v.isSeason && (
+                          <Badge variant="outline" className="mr-1.5 h-4 px-1 text-[9px]">
+                            番剧
+                          </Badge>
+                        )}
+                        {v.title}
+                      </TableCell>
+                      <TableCell
+                        className="hidden max-w-[120px] truncate text-muted-foreground sm:table-cell"
+                        title={v.owner}
+                      >
+                        {v.owner}
+                      </TableCell>
+                      <TableCell>
+                        <QualityBadge code={v.quality} label={v.qualityLabel} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatBytes(v.totalBytes)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-mono text-xs tabular-nums">
+                        {formatDuration(v.totalDurationMs)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {v.pages > 1 ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+                            <LayersIcon className="size-2.5" />
+                            {v.pages}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
               </TableBody>
@@ -144,8 +193,8 @@ export function VideoTable({
         </TabsContent>
 
         {/* 按条目（分P/分集） */}
-        <TabsContent value="items" className="m-0">
-          <div className="max-h-[560px] overflow-auto xl:max-h-[78vh]">
+        <TabsContent value="items" className="m-0 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+          <div className="max-h-[560px] overflow-auto xl:max-h-none xl:min-h-0 xl:flex-1">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -160,7 +209,7 @@ export function VideoTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {report.items.map((it) => (
+                {items.map((it) => (
                   <TableRow key={it.path} className="text-sm">
                     <TableCell className="pr-0">
                       <PlayButton onClick={() => onPlay(it)} />
@@ -168,10 +217,8 @@ export function VideoTable({
                     <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
                       P{it.page || '?'}
                     </TableCell>
-                    <TableCell
-                      className="max-w-[280px] truncate"
-                      title={it.part || it.title}
-                    >
+                    <TableCell className="max-w-[280px] truncate" title={it.part || it.title}>
+                      {it.isCharge && <ChargeBadge />}
                       {it.part || it.title}
                     </TableCell>
                     <TableCell

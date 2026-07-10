@@ -177,3 +177,7 @@
   height: 100%;
   object-fit: contain;
 }
+/* 隐藏弹幕发送输入框（保留显示开关 .apd-toggle 与设置 .apd-config），仅看不发 */
+.art-shell .apd-input {
+  display: none !important;
+}
