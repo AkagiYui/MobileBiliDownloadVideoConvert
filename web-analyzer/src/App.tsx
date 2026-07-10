@@ -20,7 +20,7 @@ import { aggregate, parseEntry, type CacheItem, type CacheReport, type RawEntry 
 const PlayerPage = lazy(() => import('@/pages/PlayerPage'))
 
 type Source = 'device' | 'sample'
-const DEFAULT_PACKAGE = 'tv.danmaku.bilj'
+const DEFAULT_PACKAGE = 'tv.danmaku.bili'
 
 export default function App() {
   return (
@@ -154,7 +154,7 @@ function AppInner() {
       <div className="flex flex-col gap-4">
         <Toolbar
           source={source}
-          packageName={source === 'sample' ? '示例 · tv.danmaku.bilj' : packageName}
+          packageName={source === 'sample' ? '示例 · tv.danmaku.bili' : packageName}
           itemCount={report.itemCount}
           skipped={skipped}
           busy={busy}

@@ -14,7 +14,7 @@ export const AppContext = createContext<AppStore>({
   report: null,
   source: null,
   connection: null,
-  packageName: 'tv.danmaku.bilj',
+  packageName: 'tv.danmaku.bili',
 })
 
 export const useAppStore = () => useContext(AppContext)

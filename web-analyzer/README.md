@@ -6,14 +6,14 @@
 
 ## 技术栈
 
-| 层 | 选型 |
-|---|---|
-| 构建 | **Vite 8** + React 19 + TypeScript |
-| UI | **shadcn/ui** + Tailwind CSS v4（Geist / Geist Mono） |
-| 路由 | **react-router**（HashRouter）—— 播放为独立路由页 `#/play/:avid` |
-| 设备连接 | **[ya-webadb / Tango](https://github.com/yume-chan/ya-webadb)** —— 浏览器内 WebUSB 实现的 ADB 协议 |
-| 播放 | **[ArtPlayer](https://artplayer.org)** + `artplayer-plugin-danmuku` + MSE 双 SourceBuffer + `mp4box`（编码探测） |
-| 保存 | **File System Access**（`showSaveFilePicker` 边拉边写磁盘）+ 自研 box 级 fMP4 流式合并（混流，编码无关，不依赖 ffmpeg） |
+| 层       | 选型                                                                                                                    |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 构建     | **Vite 8** + React 19 + TypeScript                                                                                      |
+| UI       | **shadcn/ui** + Tailwind CSS v4（Geist / Geist Mono）                                                                   |
+| 路由     | **react-router**（HashRouter）—— 播放为独立路由页 `#/play/:avid`                                                        |
+| 设备连接 | **[ya-webadb / Tango](https://github.com/yume-chan/ya-webadb)** —— 浏览器内 WebUSB 实现的 ADB 协议                      |
+| 播放     | **[ArtPlayer](https://artplayer.org)** + `artplayer-plugin-danmuku` + MSE 双 SourceBuffer + `mp4box`（编码探测）        |
+| 保存     | **File System Access**（`showSaveFilePicker` 边拉边写磁盘）+ 自研 box 级 fMP4 流式合并（混流，编码无关，不依赖 ffmpeg） |
 
 核心只用到 ADB 的 **sync 子协议**（等价 `adb pull`）遍历目录、读取 `entry.json` 与媒体文件，与桌面 adb 走同一套协议，因此对 Android 11+ 的 `Android/data` 隔离目录同样具备 shell 用户的读取权限。
 
@@ -42,7 +42,7 @@ pnpm build    # 类型检查 + 生产构建
 1. 手机开启「开发者选项 → USB 调试」，用数据线连接电脑；
 2. **先关闭电脑上占用设备的 adb server**（`adb kill-server`），否则 WebUSB 无法独占该设备；
 3. 点击「连接手机并扫描」，在浏览器弹窗中选择设备并授权；
-4. 自动扫描缓存目录并生成报告。可在包名框改成其它客户端包名（默认 `tv.danmaku.bilj`）。
+4. 自动扫描缓存目录并生成报告。可在包名框改成其它客户端包名（默认 `tv.danmaku.bili`）。
 
 没有手机也可以点「**载入示例**」查看真实数据（140 条目）生成的完整报告。
 
