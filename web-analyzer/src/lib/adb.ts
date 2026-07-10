@@ -231,6 +231,32 @@ export async function openMediaStreams(
   }
 }
 
+/**
+ * 打开单个媒体文件（video.m4s 或 audio.m4s）的流，用于流式下载（边拉边写磁盘）。
+ * 返回的 dispose 应在读取结束后调用以关闭 sync 会话。
+ */
+export async function openMediaFile(
+  adb: Adb,
+  packageName: string,
+  item: { path: string; typeTag: string },
+  which: 'video' | 'audio',
+): Promise<{ stream: ByteStream; dispose: () => Promise<void> }> {
+  const base = `${cacheRoot(packageName)}/${item.path}`
+  const dir = item.typeTag ? `${base}/${item.typeTag}` : base
+  const sync = await adb.sync()
+  const stream = sync.read(`${dir}/${which}.m4s`) as unknown as ByteStream
+  return {
+    stream,
+    dispose: async () => {
+      try {
+        await sync.dispose()
+      } catch {
+        /* ignore */
+      }
+    },
+  }
+}
+
 /** 默认的 B站缓存根目录（download 目录）。 */
 export function cacheRoot(packageName: string): string {
   return `/sdcard/Android/data/${packageName}/download`

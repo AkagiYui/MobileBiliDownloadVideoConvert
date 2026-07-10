@@ -22,18 +22,11 @@ import {
   type ByteStream,
   type DualStreamHandle,
 } from '@/lib/media'
-import {
-  exportAudio,
-  exportMuxed,
-  exportVideo,
-  downloadBytes,
-  safeFilename,
-  loadFfmpeg,
-  type ExportMeta,
-} from '@/lib/ffmpeg'
+import { exportMuxed, loadFfmpeg, type ExportMeta } from '@/lib/ffmpeg'
+import { downloadBytes, safeFilename, saveStreamed, type StreamSource } from '@/lib/download'
 import { formatBytes, formatDuration, type CacheItem } from '@/lib/bili'
 import type { Connection } from '@/lib/adb'
-import { openMediaStreams, readMedia } from '@/lib/adb'
+import { openMediaFile, openMediaStreams, readMedia } from '@/lib/adb'
 import { cn } from '@/lib/utils'
 
 type ExportKind = 'video' | 'audio' | 'mux'
@@ -72,6 +65,7 @@ export function PlayerView({
   const [playbackWarning, setPlaybackWarning] = useState('')
   const [exporting, setExporting] = useState<ExportKind | null>(null)
   const [exportRatio, setExportRatio] = useState(0)
+  const [exportNote, setExportNote] = useState('')
   const [danmakuXml, setDanmakuXml] = useState('')
 
   useEffect(() => setIndex(startIndex), [startIndex, playlist])
@@ -189,79 +183,114 @@ export function PlayerView({
     }
   }, [item, container, source, connection, packageName])
 
-  const meta = useCallback((): ExportMeta => {
-    const title =
-      item?.part && item.part !== item.title ? `${item.title} - ${item.part}` : item?.title ?? '视频'
-    return {
-      title,
+  // 文件名/标题基名：多P视频带上 P序号避免重名；单P带上分段名（若与标题不同）
+  const baseName = useCallback(() => {
+    if (!item) return '视频'
+    let name = item.title
+    if (multi) name += ` P${item.page}`
+    else if (item.part && item.part !== item.title) name += ` ${item.part}`
+    return name
+  }, [item, multi])
+
+  const meta = useCallback(
+    (): ExportMeta => ({
+      title: baseName(),
       artist: item?.owner ?? '',
       comment: item?.bvid || `av${item?.avid ?? ''}`,
       date: item?.createdAt ? String(new Date(item.createdAt).getFullYear()) : undefined,
-    }
-  }, [item])
+    }),
+    [item, baseName],
+  )
 
-  // 导出按需整段读取（与流式播放相互独立）
-  const loadFullBytes = useCallback(async () => {
-    if (!item) throw new Error('无可导出的条目')
-    if (source === 'sample') {
-      const base = `${import.meta.env.BASE_URL}demo/`
-      const [video, audio, cover] = await Promise.all([
-        fetchBytes(`${base}video.m4s`),
-        fetchBytes(`${base}audio.m4s`),
-        fetchBytes(`${base}cover.jpg`).catch(() => undefined),
-      ])
-      return { video, audio, cover }
+  // 完整视频（混流）：需整段读入内存交给 ffmpeg 合成，超大文件受内存限制
+  const runMux = useCallback(async () => {
+    if (!item) return
+    setExporting('mux')
+    setExportRatio(0)
+    setExportNote('')
+    const tid = toast.loading('读取媒体并合成…')
+    try {
+      let video: Uint8Array
+      let audio: Uint8Array
+      let cover: Uint8Array | undefined
+      if (source === 'sample') {
+        const b = `${import.meta.env.BASE_URL}demo/`
+        ;[video, audio, cover] = await Promise.all([
+          fetchBytes(`${b}video.m4s`),
+          fetchBytes(`${b}audio.m4s`),
+          fetchBytes(`${b}cover.jpg`).catch(() => undefined),
+        ])
+      } else {
+        if (!connection) throw new Error('设备连接已断开')
+        const bundle = await readMedia(connection.adb, packageName, item, (s, n) =>
+          setExportNote(`读取${s === 'video' ? '视频' : '音频'} ${formatBytes(n)}`),
+        )
+        video = bundle.video
+        audio = bundle.audio
+        cover = item.cover ? await fetchBytes(item.cover).catch(() => undefined) : undefined
+      }
+      const totalMb = (video.length + audio.length) / 1e6
+      if (totalMb > 700) {
+        toast.warning('文件较大，合成可能因内存不足失败', {
+          description: `约 ${totalMb.toFixed(0)} MB，可改用「仅画面 / 仅音频」流式保存。`,
+        })
+      }
+      setExportNote('')
+      await loadFfmpeg()
+      const out = await exportMuxed(video, audio, meta(), cover, (p) => setExportRatio(p.ratio))
+      downloadBytes(out, `${safeFilename(baseName())}.mp4`, 'video/mp4')
+      toast.success('已导出到本地', { id: tid })
+    } catch (err) {
+      toast.error('导出失败', { id: tid, description: (err as Error).message })
+    } finally {
+      setExporting(null)
+      setExportRatio(0)
+      setExportNote('')
     }
-    if (!connection) throw new Error('设备连接已断开')
-    const bundle = await readMedia(connection.adb, packageName, item, (stream, n) =>
-      setLoadNote(`读取${stream === 'video' ? '视频' : '音频'} ${formatBytes(n)}`),
-    )
-    const cover = item.cover ? await fetchBytes(item.cover).catch(() => undefined) : undefined
-    return { video: bundle.video, audio: bundle.audio, cover }
-  }, [item, source, connection, packageName])
+  }, [item, source, connection, packageName, meta, baseName])
 
-  const runExport = useCallback(
-    async (kind: ExportKind) => {
+  // 仅画面 / 仅音频：请求浏览器保存，再从手机边拉边写磁盘，内存不驻留整段
+  const runStreamSave = useCallback(
+    async (kind: 'video' | 'audio') => {
       if (!item) return
       setExporting(kind)
-      setExportRatio(0)
-      const tid = toast.loading('读取媒体并封装…')
+      setExportNote('')
+      const name = safeFilename(baseName())
+      const filename = kind === 'video' ? `${name}.画面.mp4` : `${name}.音频.m4a`
+      const mime = kind === 'video' ? 'video/mp4' : 'audio/mp4'
+      const open = async (): Promise<StreamSource> => {
+        if (source === 'sample') {
+          const res = await fetch(`${import.meta.env.BASE_URL}demo/${kind}.m4s`)
+          if (!res.body) throw new Error('示例媒体加载失败')
+          return { stream: res.body as unknown as ByteStream }
+        }
+        if (!connection) throw new Error('设备连接已断开')
+        return openMediaFile(connection.adb, packageName, item, kind)
+      }
       try {
-        const { video, audio, cover } = await loadFullBytes()
-        const totalMb = (video.length + audio.length) / 1e6
-        if (totalMb > 700) {
-          toast.warning('文件较大，浏览器内封装可能因内存不足失败', {
-            description: `约 ${totalMb.toFixed(0)} MB，如失败请改用桌面工具。`,
-          })
-        }
-        await loadFfmpeg()
-        const m = meta()
-        const base = safeFilename(m.title)
-        const onP = (p: { ratio: number }) => setExportRatio(p.ratio)
-        if (kind === 'video') {
-          downloadBytes(await exportVideo(video, m, onP), `${base}.视频流.mp4`, 'video/mp4')
-        } else if (kind === 'audio') {
-          downloadBytes(await exportAudio(audio, m, cover, onP), `${base}.音频流.m4a`, 'audio/mp4')
-        } else {
-          downloadBytes(await exportMuxed(video, audio, m, cover, onP), `${base}.mp4`, 'video/mp4')
-        }
-        toast.success('已导出到本地', { id: tid })
+        const result = await saveStreamed(filename, mime, open, (b) =>
+          setExportNote(`已保存 ${formatBytes(b)}`),
+        )
+        if (result === 'saved') toast.success('已保存到本地')
       } catch (err) {
-        toast.error('导出失败', { id: tid, description: (err as Error).message })
+        toast.error('保存失败', { description: (err as Error).message })
       } finally {
         setExporting(null)
-        setExportRatio(0)
+        setExportNote('')
       }
     },
-    [item, loadFullBytes, meta],
+    [item, source, connection, packageName, baseName],
   )
 
   const downloadDanmaku = useCallback(() => {
     if (!danmakuXml || !item) return
-    const name = safeFilename(meta().title)
-    downloadBytes(new TextEncoder().encode(danmakuXml), `${name}.弹幕.xml`, 'application/xml')
+    downloadBytes(
+      new TextEncoder().encode(danmakuXml),
+      `${safeFilename(baseName())}.弹幕.xml`,
+      'application/xml',
+    )
     toast.success('已保存弹幕文件')
-  }, [danmakuXml, item, meta])
+  }, [danmakuXml, item, baseName])
 
   const busyExport = exporting !== null
 
@@ -360,13 +389,13 @@ export function PlayerView({
       <div className="mt-5 flex flex-col gap-2 rounded-xl border bg-card p-4">
         <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <DownloadIcon className="size-3.5" />
-          保存到本地（自动写入标题、UP 主等信息与封面）
+          保存到本地
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Button
             variant="outline"
             disabled={!item || busyExport}
-            onClick={() => runExport('mux')}
+            onClick={runMux}
             className="justify-start gap-2"
           >
             {exporting === 'mux' ? (
@@ -379,7 +408,7 @@ export function PlayerView({
           <Button
             variant="outline"
             disabled={!item || busyExport}
-            onClick={() => runExport('video')}
+            onClick={() => runStreamSave('video')}
             className="justify-start gap-2"
           >
             {exporting === 'video' ? (
@@ -392,7 +421,7 @@ export function PlayerView({
           <Button
             variant="outline"
             disabled={!item || busyExport}
-            onClick={() => runExport('audio')}
+            onClick={() => runStreamSave('audio')}
             className="justify-start gap-2"
           >
             {exporting === 'audio' ? (
@@ -413,9 +442,18 @@ export function PlayerView({
             弹幕
           </Button>
         </div>
-        {busyExport && <Progress value={exportRatio > 0 ? exportRatio * 100 : null} />}
+        {busyExport &&
+          (exporting === 'mux' ? (
+            <div className="flex flex-col gap-1">
+              <Progress value={exportRatio > 0 ? exportRatio * 100 : null} />
+              {exportNote && <div className="text-xs text-muted-foreground">{exportNote}</div>}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">{exportNote || '准备保存…'}</div>
+          ))}
         <p className="text-[11px] text-muted-foreground/70">
-          视频边下边播，大文件也能顺畅观看；保存时需要完整读取，文件很大时会慢一些。 时长{' '}
+          「完整视频」合成音画并写入标题 / UP 主 / 封面，需读入内存，超大文件可能失败；
+          「仅画面 / 仅音频」边拉边存到磁盘，可保存超大文件。时长{' '}
           {item ? formatDuration(item.durationMs) : '—'}。
         </p>
       </div>

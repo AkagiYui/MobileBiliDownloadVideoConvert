@@ -101,44 +101,6 @@ async function run(
   }
 }
 
-/** 视频流 → mp4（仅视频，重封装 + 元数据）。 */
-export async function exportVideo(
-  videoBytes: Uint8Array,
-  meta: ExportMeta,
-  onProgress?: (p: ExportProgress) => void,
-): Promise<Uint8Array> {
-  const ff = await loadFfmpeg()
-  const args = [
-    '-i',
-    'video.m4s',
-    '-c',
-    'copy',
-    ...metaArgs(meta),
-    '-movflags',
-    '+faststart',
-    'out.mp4',
-  ]
-  return run(ff, [{ name: 'video.m4s', data: videoBytes }], args, 'out.mp4', onProgress)
-}
-
-/** 音频流 → m4a（重封装 + 元数据，可选封面）。 */
-export async function exportAudio(
-  audioBytes: Uint8Array,
-  meta: ExportMeta,
-  coverBytes?: Uint8Array,
-  onProgress?: (p: ExportProgress) => void,
-): Promise<Uint8Array> {
-  const ff = await loadFfmpeg()
-  const inputs = [{ name: 'audio.m4s', data: audioBytes }]
-  const args = ['-i', 'audio.m4s']
-  if (coverBytes) {
-    inputs.push({ name: 'cover.jpg', data: coverBytes })
-    args.push('-i', 'cover.jpg', '-map', '0:a', '-map', '1', '-disposition:v:0', 'attached_pic')
-  }
-  args.push('-c', 'copy', ...metaArgs(meta), 'out.m4a')
-  return run(ff, inputs, args, 'out.m4a', onProgress)
-}
-
 /** 视频流 + 音频流 → mp4 混流（重封装 + 元数据，可选封面）。 */
 export async function exportMuxed(
   videoBytes: Uint8Array,
@@ -172,23 +134,4 @@ export async function exportMuxed(
   }
   args.push('-c', 'copy', ...metaArgs(meta), '-movflags', '+faststart', 'out.mp4')
   return run(ff, inputs, args, 'out.mp4', onProgress)
-}
-
-/** 触发浏览器下载。 */
-export function downloadBytes(data: Uint8Array, filename: string, mime: string) {
-  const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-  const blob = new Blob([ab], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 4000)
-}
-
-/** 转成 Windows/跨平台安全的文件名。 */
-export function safeFilename(name: string): string {
-  return name.replace(/[/\\*?"<>|:\r\n]+/g, '_').slice(0, 120)
 }
