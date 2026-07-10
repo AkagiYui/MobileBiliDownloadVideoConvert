@@ -415,10 +415,11 @@ export function PlayerView({
         {busyExport && (
           <div className="text-xs text-muted-foreground">{exportNote || '准备保存…'}</div>
         )}
-        <p className="text-[11px] text-muted-foreground/70">
-          三者都是边从手机拉取、边写入磁盘（先选保存位置），内存不驻留整段，可保存超大文件。时长{' '}
-          {item ? formatDuration(item.durationMs) : '—'}。
-        </p>
+        {item && (
+          <p className="text-[11px] text-muted-foreground/70">
+            时长 {formatDuration(item.durationMs)} · 大小 {formatBytes(item.downloadedBytes)}
+          </p>
+        )}
       </div>
     </div>
   )
